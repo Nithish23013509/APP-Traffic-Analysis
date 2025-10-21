@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Website Connection Visualizer</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f8f9fa; display: flex; flex-direction: column; align-items: center;}
+        .header { background: #343a40; color: white; padding: 1rem; text-align: center; width: 100%;}
+        .controls { background: #fff; padding: 1rem; margin-top: 1rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center;}
+        .controls button { padding: 10px 20px; font-size: 14px; margin: 0 10px; cursor: pointer; border-radius: 5px; border: 1px solid transparent; transition: background-color 0.2s ease;}
+        #startBtn { background-color: #28a745; color: white; }
+        #stopBtn { background-color: #dc3545; color: white; }
+        #status { font-weight: bold; margin-top: 10px; font-size: 14px; color: #6c757d;}
+        .container { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; width: 100%; max-width: 1400px; margin-top: 2rem; }
+        #chart-container { flex: 2; display: flex; justify-content: center; align-items: center; }
+        #legend-container { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.5rem; margin-left: 2rem; min-width: 250px;}
+        .legend-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem;}
+        .legend-item { display: flex; align-items: center; margin-bottom: 0.75rem; font-size: 1rem;}
+        .legend-color { width: 20px; height: 20px; border-radius: 4px; margin-right: 10px;}
+        .legend-count { margin-left: auto; font-weight: 500;}
+        .slice-label { font-size: 12px; fill: white; font-weight: bold; text-anchor: middle; }
+        svg .arc path { cursor: pointer; }
+        #details-container { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.5rem; margin-left: 2rem; min-width: 300px; display: none; }
+        .details-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;}
+        #details-list { list-style-type: none; padding: 0; max-height: 400px; overflow-y: auto; }
+        #details-list li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; word-break: break-all; cursor: pointer; }
+        #details-list li:hover { background-color: #f0f0f0; }
+        #close-details { font-size: 24px; cursor: pointer; color: #aaa; }
+        #close-details:hover { color: #333; }
+
+        /* --- NEW: Modal Styles --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 80%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .modal-title { font-size: 1.3rem; font-weight: 600; word-break: break-all; }
+        .close-modal { font-size: 28px; cursor: pointer; color: #aaa; }
+        .modal-body p { margin: 10px 0; }
+        .modal-body strong { color: #333; }
+        .tracker-warning { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>Website Connection Visualizer</h1></div>
+    <div class="controls">
+        <button id="startBtn">Start Monitoring Active Tab</button>
+        <button id="stopBtn">Stop Monitoring</button>
+        <div id="status">Status: Inactive</div>
+    </div>
+    <div class="container">
+        <div id="chart-container"><svg width="500" height="500"></svg></div>
+        <div id="legend-container">
+            <div class="legend-title">Connection Types</div>
+            <div id="legend"></div>
+        </div>
+        <div id="details-container">
+            <div class="details-title">
+                <span id="details-category-title">Domains</span>
+                <span id="close-details" title="Close">&times;</span>
+            </div>
+            <ul id="details-list"></ul>
+        </div>
+    </div>
+    
+    <!-- --- NEW: Modal for Request Details --- -->
+    <div id="request-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title" class="modal-title">Request Details</h3>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <p><strong>Full URL:</strong> <span id="modal-full-url"></span></p>
+                <p><strong>Method:</strong> <span id="modal-method"></span></p>
+                <p><strong>Tracker Status:</strong> <span id="modal-tracker-status"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="d3.v5.min.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>
+
