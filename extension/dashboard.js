@@ -8,7 +8,7 @@ const pie = d3.pie().sort(null).value(d => d.value.size);
 const path = d3.arc().outerRadius(radius - 10).innerRadius(0);
 const labelArc = d3.arc().outerRadius(radius - 60).innerRadius(radius - 60);
 
-// Data now stores a map of domains to their request details
+// Data structure: { "Category": Map("domain" -> [ {requestDetails}, {requestDetails} ]) }
 let categoryData = {};
 
 const startBtn = document.getElementById('startBtn');
@@ -18,16 +18,11 @@ const detailsContainer = document.getElementById('details-container');
 const closeDetailsBtn = document.getElementById('close-details');
 const detailsList = document.getElementById('details-list');
 const detailsTitle = document.getElementById('details-category-title');
-
-// --- NEW: Modal elements ---
 const requestModal = document.getElementById('request-modal');
 const closeModal = document.querySelector('.close-modal');
 const modalTitle = document.getElementById('modal-title');
-const modalFullUrl = document.getElementById('modal-full-url');
-const modalMethod = document.getElementById('modal-method');
-const modalTrackerStatus = document.getElementById('modal-tracker-status');
+const modalBody = document.getElementById('modal-body');
 
-// --- NEW: A simple list of known tracker/ad strings ---
 const TRACKER_LIST = new Set([
     'google-analytics', 'googletagmanager', 'doubleclick', 'googleadservices',
     'googlesyndication', 'facebook', 'fbcdn', 'connect.facebook.net',
@@ -36,9 +31,7 @@ const TRACKER_LIST = new Set([
 
 function isTracker(domain) {
     for (const tracker of TRACKER_LIST) {
-        if (domain.includes(tracker)) {
-            return true;
-        }
+        if (domain.includes(tracker)) return true;
     }
     return false;
 }
@@ -58,11 +51,7 @@ function categorizeDomain(domain) {
 
 function updateStatus() {
     chrome.storage.local.get(['isMonitoring', 'monitoringTabTitle'], (result) => {
-        if (result.isMonitoring && result.monitoringTabTitle) {
-            statusEl.textContent = `Status: Active (Monitoring: ${result.monitoringTabTitle})`;
-        } else {
-            statusEl.textContent = 'Status: Inactive';
-        }
+        statusEl.textContent = result.isMonitoring ? `Status: Active (Monitoring: ${result.monitoringTabTitle || '...'})` : 'Status: Inactive';
     });
 }
 
@@ -72,8 +61,7 @@ startBtn.addEventListener('click', () => {
         let targetTab = null;
         for (let i = tabs.length - 1; i >= 0; i--) {
             if (tabs[i].url && tabs[i].url !== dashboardUrl && tabs[i].url.startsWith("http")) {
-                targetTab = tabs[i];
-                break;
+                targetTab = tabs[i]; break;
             }
         }
         if (targetTab) {
@@ -86,18 +74,10 @@ startBtn.addEventListener('click', () => {
 
 stopBtn.addEventListener('click', () => chrome.runtime.sendMessage({ command: "stop" }));
 closeDetailsBtn.addEventListener('click', () => detailsContainer.style.display = 'none');
-
-// --- NEW: Event listeners for the modal ---
 closeModal.addEventListener('click', () => requestModal.style.display = 'none');
-requestModal.addEventListener('click', (e) => {
-    if (e.target === requestModal) { // Close if clicking on the overlay
-        requestModal.style.display = 'none';
-    }
-});
+requestModal.addEventListener('click', (e) => { if (e.target === requestModal) requestModal.style.display = 'none'; });
 
-chrome.storage.onChanged.addListener((changes) => {
-    if (changes.isMonitoring || changes.monitoringTabTitle) updateStatus();
-});
+chrome.storage.onChanged.addListener((changes) => { if (changes.isMonitoring || changes.monitoringTabTitle) updateStatus(); });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "CLEAR") {
@@ -105,16 +85,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         detailsContainer.style.display = 'none';
         requestModal.style.display = 'none';
     } else if (message.type === "DATA") {
-        const { domain, fullUrl, method } = message.data;
-        const category = categorizeDomain(domain);
+        const details = message.data; // { domain, fullUrl, method, status, type }
+        const category = categorizeDomain(details.domain);
         
-        if (!categoryData[category]) {
-            categoryData[category] = new Map();
-        }
-        if (!categoryData[category].has(domain)) {
-            categoryData[category].set(domain, []);
-        }
-        categoryData[category].get(domain).push({ fullUrl, method });
+        if (!categoryData[category]) categoryData[category] = new Map();
+        if (!categoryData[category].has(details.domain)) categoryData[category].set(details.domain, []);
+        
+        categoryData[category].get(details.domain).push(details);
     }
     updateChart();
 });
@@ -122,42 +99,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function showDetails(category) {
     const domainsMap = categoryData[category];
     if (!domainsMap) return;
-
     detailsTitle.textContent = `Domains in "${category}"`;
     detailsList.innerHTML = '';
-
     const sortedDomains = Array.from(domainsMap.keys()).sort();
-    
     sortedDomains.forEach(domain => {
         const li = document.createElement('li');
         li.textContent = domain;
-        // --- MODIFIED: Add a click listener to show the request modal ---
         li.addEventListener('click', () => {
             const requests = domainsMap.get(domain);
             showRequestModal(domain, requests);
         });
         detailsList.appendChild(li);
     });
-
     detailsContainer.style.display = 'block';
 }
 
-// --- NEW: Function to show the modal with request details ---
+// --- UPDATED: Function to show all requests in the modal ---
 function showRequestModal(domain, requests) {
     modalTitle.textContent = domain;
-    modalFullUrl.textContent = requests[0].fullUrl; // Show the first request's URL
-    modalMethod.textContent = requests[0].method;
-    
-    if (isTracker(domain)) {
-        modalTrackerStatus.textContent = "Known Tracker/Advertiser";
-        modalTrackerStatus.className = 'tracker-warning';
-    } else {
-        modalTrackerStatus.textContent = "Not a known tracker.";
-        modalTrackerStatus.className = '';
-    }
-    
+    modalBody.innerHTML = ''; // Clear previous requests
+
+    const trackerStatus = isTracker(domain) ? '<span class="tracker-warning">Known Tracker/Advertiser</span>' : 'Not a known tracker.';
+    const trackerP = document.createElement('p');
+    trackerP.innerHTML = `<strong>Tracker Status:</strong> ${trackerStatus}`;
+    modalBody.appendChild(trackerP);
+
+    requests.forEach(req => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'request-item';
+
+        // --- Status Code Styling ---
+        let statusClass = '';
+        if (req.status >= 200 && req.status < 300) statusClass = 'status-ok';
+        else if (req.status >= 300 && req.status < 400) statusClass = 'status-redirect';
+        else if (req.status >= 400) statusClass = 'status-error';
+
+        itemDiv.innerHTML = `
+            <p><strong>URL:</strong> ${req.fullUrl}</p>
+            <p><strong>Method:</strong> ${req.method}</p>
+            <p><strong>Status:</strong> <span class="${statusClass}">${req.status}</span></p>
+            <p><strong>Type:</strong> ${req.type || 'N/A'}</p>
+        `;
+        modalBody.appendChild(itemDiv);
+    });
+
     requestModal.style.display = 'flex';
 }
+
 
 function updateChart() {
     const data_ready = Object.entries(categoryData).map(([key, value]) => ({ key, value }));
@@ -171,13 +159,10 @@ function updateChart() {
         .transition().duration(750)
         .attrTween("d", function(d) {
             const i = d3.interpolate(this._current || { startAngle: 0, endAngle: 0 }, d);
-            this._current = i(1);
-            return (t) => path(i(t));
+            this._current = i(1); return (t) => path(i(t));
         });
-    merged.select("text")
-        .text(d => d.data.value.size > 2 ? d.data.key : '')
-        .transition().duration(750)
-        .attr("transform", d => `translate(${labelArc.centroid(d)})`);
+    merged.select("text").text(d => d.data.value.size > 2 ? d.data.key : '')
+        .transition().duration(750).attr("transform", d => `translate(${labelArc.centroid(d)})`);
     const legend = d3.select("#legend");
     legend.html("");
     const sortedData = data_ready.sort((a, b) => b.value.size - a.value.size);
