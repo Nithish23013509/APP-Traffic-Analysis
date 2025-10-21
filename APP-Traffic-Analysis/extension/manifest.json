@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Real-time Website Visualizer",
-    "version": "2.0",
-    "description": "Captures network traffic and visualizes it on a dashboard.",
+    "version": "1.3",
+    "description": "Captures network traffic and visualizes it.",
     "permissions": [
         "debugger",
         "tabs",
