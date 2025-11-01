@@ -116,6 +116,7 @@ You can load it manually as an **unpacked extension**.
 
 ## 🧑‍💻 Author
 **Developed by:** NITHISH S
+
 **Technologies Used:** HTML5, CSS3, JavaScript (ES6+), D3.js, Chrome Debugger API  
 
 ---
